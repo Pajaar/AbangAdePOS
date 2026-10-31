@@ -18,6 +18,7 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
   - `000004_seed_akun_cek_harga`: seed `akun` dan endpoint `POST /api/v1/kasir/cek-harga` (menu Kasir)
   - `000005_endpoint_penyesuaian_stok`: endpoint `POST/GET /api/v1/produk/:id/penyesuaian-stok` di menu Produk (admin + headadmin)
   - Perubahan skema berikutnya selalu lewat file migrasi **baru**; jangan ubah migrasi yang sudah ada karena mungkin sudah dijalankan di database. Setelah menambah migrasi, jalankan `sqlc generate`.
+  - Menjalankan migrasi ke database di `.env` (Railway): `.\scripts\migrate.ps1 up` (juga `version`, `down 1`, dst.). Skrip membaca `.env` sendiri, menyamarkan password di output, dan minta konfirmasi nama database untuk `drop`/`down`/`force`/`goto`. Database Railway berisi data asli: jangan jalankan `drop` atau `down` tanpa izin eksplisit user.
 
 ## Aturan wajib saat menulis kode
 
