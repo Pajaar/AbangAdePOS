@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"pos-jamu-backend/internal/common/httpctx"
 	"pos-jamu-backend/internal/common/processor"
 	"pos-jamu-backend/internal/dto"
 	"pos-jamu-backend/internal/util"
@@ -104,7 +105,7 @@ func (h *AuthController) Logout(c *gin.Context) {
 }
 
 func (h *AuthController) Me(c *gin.Context) {
-	userID, ok := userIDFromContext(c)
+	userID, ok := httpctx.UserID(c)
 	if !ok {
 		util.Error(c, apperror.Unauthorized("Belum login"))
 		return
@@ -119,7 +120,7 @@ func (h *AuthController) Me(c *gin.Context) {
 }
 
 func (h *AuthController) Menus(c *gin.Context) {
-	roleKode, ok := roleFromContext(c)
+	roleKode, ok := httpctx.RoleKode(c)
 	if !ok {
 		util.Error(c, apperror.Unauthorized("Belum login"))
 		return
@@ -153,22 +154,4 @@ func parseSameSite(v string) http.SameSite {
 	default:
 		return http.SameSiteLaxMode
 	}
-}
-
-func userIDFromContext(c *gin.Context) (uint64, bool) {
-	v, ok := c.Get("user_id")
-	if !ok {
-		return 0, false
-	}
-	id, ok := v.(uint64)
-	return id, ok
-}
-
-func roleFromContext(c *gin.Context) (string, bool) {
-	v, ok := c.Get("role")
-	if !ok {
-		return "", false
-	}
-	role, ok := v.(string)
-	return role, ok && role != ""
 }

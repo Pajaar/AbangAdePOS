@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"pos-jamu-backend/internal/authorize"
+	"pos-jamu-backend/internal/common/httpctx"
 	"pos-jamu-backend/internal/common/route"
 	"pos-jamu-backend/internal/config"
 	"pos-jamu-backend/internal/middleware"
-	"pos-jamu-backend/internal/util"
 )
 
 type Deps struct {
@@ -28,6 +28,8 @@ type Deps struct {
 // Recovery -> RequestID -> Logger -> CORS, baru kemudian route group.
 // CORS harus sebelum Auth karena preflight OPTIONS tidak membawa token.
 func New(deps Deps) *gin.Engine {
+	httpctx.UseJSONFieldNames()
+
 	r := gin.New()
 
 	r.Use(middleware.Recovery())
@@ -57,14 +59,6 @@ func New(deps Deps) *gin.Engine {
 	for _, m := range deps.Modules {
 		m.RegisterRoutes(groups)
 	}
-	protected := groups.Protected
-
-	// Stub sementara untuk memverifikasi Authorize (401/403/200) sebelum
-	// fitur Produk sungguhan ada di Tahap 2. Pola endpoint ini sudah
-	// terdaftar di seed akses (menu 'produk').
-	protected.GET("/kategori", func(c *gin.Context) {
-		util.Success(c, http.StatusOK, []any{})
-	})
 
 	return r
 }

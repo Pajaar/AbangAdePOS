@@ -47,3 +47,40 @@ func (q *Queries) ListAllPermissions(ctx context.Context) ([]ListAllPermissionsR
 	}
 	return items, nil
 }
+
+const listAllRoleActions = `-- name: ListAllRoleActions :many
+SELECT r.kode AS role_kode, m.kode AS aksi_kode
+FROM role_menus rm
+JOIN menus m ON m.id = rm.menu_id
+JOIN roles r ON r.id = rm.role_id
+WHERE m.tipe = 'aksi'
+`
+
+type ListAllRoleActionsRow struct {
+	RoleKode string `json:"role_kode"`
+	AksiKode string `json:"aksi_kode"`
+}
+
+// Izin tanpa halaman (menus.tipe = 'aksi', misalnya lihat_hpp) per role.
+func (q *Queries) ListAllRoleActions(ctx context.Context) ([]ListAllRoleActionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllRoleActions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllRoleActionsRow
+	for rows.Next() {
+		var i ListAllRoleActionsRow
+		if err := rows.Scan(&i.RoleKode, &i.AksiKode); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -47,6 +47,12 @@ type Permission struct {
 	Path     string // pola route Gin, misalnya /api/v1/produk/:id
 }
 
+// RoleAction = izin tanpa halaman (menus.tipe = 'aksi') milik sebuah role.
+type RoleAction struct {
+	RoleKode string
+	AksiKode string
+}
+
 type RefreshToken struct {
 	ID        uint64
 	UserID    uint64

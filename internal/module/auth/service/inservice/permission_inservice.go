@@ -22,3 +22,7 @@ func NewPermissionInService(db *sql.DB) *PermissionInService {
 func (s *PermissionInService) ListAll(ctx context.Context) ([]domain.Permission, error) {
 	return repository.NewPermissionRepository(s.db).ListAll(ctx)
 }
+
+func (s *PermissionInService) ListAllActions(ctx context.Context) ([]domain.RoleAction, error) {
+	return repository.NewPermissionRepository(s.db).ListAllActions(ctx)
+}

@@ -9,6 +9,7 @@ import (
 
 type IPermissionRepository interface {
 	ListAll(ctx context.Context) ([]domain.Permission, error)
+	ListAllActions(ctx context.Context) ([]domain.RoleAction, error)
 }
 
 type permissionRepository struct {
@@ -33,4 +34,16 @@ func (r *permissionRepository) ListAll(ctx context.Context) ([]domain.Permission
 		})
 	}
 	return perms, nil
+}
+
+func (r *permissionRepository) ListAllActions(ctx context.Context) ([]domain.RoleAction, error) {
+	rows, err := r.q.ListAllRoleActions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	actions := make([]domain.RoleAction, 0, len(rows))
+	for _, row := range rows {
+		actions = append(actions, domain.RoleAction{RoleKode: row.RoleKode, AksiKode: row.AksiKode})
+	}
+	return actions, nil
 }

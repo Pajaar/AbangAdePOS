@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"pos-jamu-backend/internal/auth"
+	"pos-jamu-backend/internal/common/httpctx"
 	"pos-jamu-backend/internal/util"
 	"pos-jamu-backend/internal/util/apperror"
 )
@@ -37,8 +38,8 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", userID)
-		c.Set("role", claims.Role)
+		c.Set(httpctx.KeyUserID, userID)
+		c.Set(httpctx.KeyRole, claims.Role)
 		c.Next()
 	}
 }

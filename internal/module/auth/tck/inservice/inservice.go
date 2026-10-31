@@ -36,4 +36,5 @@ type IMenuInService interface {
 
 type IPermissionInService interface {
 	ListAll(ctx context.Context) ([]domain.Permission, error)
+	ListAllActions(ctx context.Context) ([]domain.RoleAction, error)
 }

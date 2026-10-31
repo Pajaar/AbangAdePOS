@@ -53,6 +53,10 @@ func NotFound(message string) *AppError {
 	return New(http.StatusNotFound, "not_found", message)
 }
 
+func Conflict(message string) *AppError {
+	return New(http.StatusConflict, "conflict", message)
+}
+
 func TooManyRequests(message string) *AppError {
 	return New(http.StatusTooManyRequests, "too_many_requests", message)
 }

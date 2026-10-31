@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"pos-jamu-backend/internal/authorize"
+	"pos-jamu-backend/internal/common/httpctx"
 	"pos-jamu-backend/internal/util"
 	"pos-jamu-backend/internal/util/apperror"
 )
@@ -13,9 +14,8 @@ import (
 // datang murni dari data seed role_menus (lihat migrations/000002).
 func Authorize(store *authorize.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roleVal, ok := c.Get("role")
-		roleKode, _ := roleVal.(string)
-		if !ok || roleKode == "" {
+		roleKode, ok := httpctx.RoleKode(c)
+		if !ok {
 			util.Error(c, apperror.Unauthorized("Belum login"))
 			c.Abort()
 			return

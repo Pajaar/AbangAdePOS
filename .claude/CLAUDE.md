@@ -16,6 +16,7 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
   - `000002_seed_akses` = isi `pos_jamu_seed_akses.sql`
   - `000003_jamu_sachet_penyesuaian_stok`: tabel `jamu_sachet` (menggantikan `jamu.sachet_id`/`sachet_per_gelas`) dan `penyesuaian_stok`
   - `000004_seed_akun_cek_harga`: seed `akun` dan endpoint `POST /api/v1/kasir/cek-harga` (menu Kasir)
+  - `000005_endpoint_penyesuaian_stok`: endpoint `POST/GET /api/v1/produk/:id/penyesuaian-stok` di menu Produk (admin + headadmin)
   - Perubahan skema berikutnya selalu lewat file migrasi **baru**; jangan ubah migrasi yang sudah ada karena mungkin sudah dijalankan di database. Setelah menambah migrasi, jalankan `sqlc generate`.
 
 ## Aturan wajib saat menulis kode
@@ -39,7 +40,7 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
 
 ## Struktur folder
 
-Arsitektur meniru proyek primecash-x-training (Spring Boot): setiap fitur adalah **modul** dengan tiga lapisan `tck` → `service` → `api`. Modul `auth` adalah contoh acuan; modul baru (produk, jamu, penjualan, piutang, pembelian, laporan, ...) mengikuti bentuk yang sama.
+Arsitektur meniru proyek primecash-x-training (Spring Boot): setiap fitur adalah **modul** dengan tiga lapisan `tck` → `service` → `api`. Modul yang sudah ada: `auth`, `produk` (contoh paling lengkap: validator, paging, filter HPP, transaksi dengan row lock + jurnal), dan `jurnal` (hanya tck + service, dipakai modul lain). Modul baru (jamu, pembelian, penjualan, piutang, laporan, ...) mengikuti bentuk yang sama.
 
 ```
 cmd/api/main.go                 # rakit modul, muat izin, jalankan router
@@ -52,6 +53,8 @@ internal/
   common/                       # ≈ library com.product.primecash.common
     processor/                  # IExecutorProcessor, IValidatorProcessor, Validate (≈ ValidationDetailsReport)
     route/                      # Groups (Public, Authenticated, Protected) + Registrar
+    access/                     # IActionChecker + ActionLihatHPP (izin aksi)
+    httpctx/                    # UserID/RoleKode dari context, ParamID, BindError (error binding → details per field JSON)
   dto/                          # ≈ dto-tck: request/response JSON, dipakai bersama
   module/<fitur>/
     tck/                        # KONTRAK, tidak bergantung ke lapisan lain
@@ -111,6 +114,8 @@ CORS hanya dipasang bila `CORS_ALLOWED_ORIGINS` di `.env` terisi (lihat Deployme
 - Izin dimuat ke memori saat start (map role → set "METHOD path"), dimuat ulang saat hak akses diubah lewat `PUT /api/v1/roles/:id/akses`.
 - Headadmin diberi semua menu secara eksplisit di data, **bukan** bypass di kode.
 - `menus.tipe = 'aksi'` adalah izin tanpa halaman. Saat ini: `lihat_hpp`. Service wajib mengecek izin ini dan **menghapus field HPP, HPP rata-rata, dan margin dari respons** kalau role tidak punya izin.
+  - Cara pakai: executor menerima `access.IActionChecker` (diimplementasikan `authorize.Store`, dimuat bersama izin endpoint), lalu memanggil mapper dengan `canSeeHPP`. Field HPP di DTO berupa pointer `omitempty`, sehingga untuk role tanpa izin field itu **tidak ada** di JSON (bukan `null`). Contoh: `module/produk/api/mapper`.
+  - Role tanpa `lihat_hpp` yang mengubah data berisi field HPP (misalnya admin mengubah produk tanpa mengirim `margin_min_persen`): field yang tidak dikirim berarti **tidak diubah**, bukan dikosongkan.
 
 | Role | Menu |
 |---|---|
@@ -145,9 +150,21 @@ HPP jamu seduh per gelas = jumlah dari `jamu_sachet.jumlah * hpp_rata_rata` seti
 - Bila HPP produk belum diketahui (`hpp_rata_rata = 0`), balas `modal_diketahui: false` untuk baris itu. Frontend tidak memerahkan, cukup tanda netral.
 - Harga **nett** = `hpp_rata_rata * (1 + margin_min_persen/100)` dan **tengah** = titik tengah harga normal dan nett, keduanya dibulatkan ke atas ke kelipatan Rp500. Hanya ditampilkan untuk role dengan izin `lihat_hpp` (misalnya halaman Produk), tidak disimpan. Bila nett ≥ harga normal, tandai produk "harga perlu dinaikkan".
 
+### Produk (sudah dibangun, modul `module/produk`)
+- `status` dihitung otomatis: `harga_normal` = 0 → `draft` (tidak tampil di kasir, scan → 409), > 0 → `aktif`. `aktif = false` = produk dinonaktifkan (tidak dihapus).
+- Produk `bisa_ditawar = true` **wajib** punya `margin_min_persen` (0–1000).
+- Harga nett/tengah dan tanda `harga_perlu_dinaikkan` hanya dihitung untuk produk yang bisa ditawar dan HPP-nya > 0.
+- Stok dan HPP tidak pernah diubah lewat tambah/ubah produk; hanya lewat penyesuaian stok, pembelian, dan penjualan.
+- Uang di JSON dikirim dan diterima sebagai **string desimal** (`"15000"`, `"12500.50"`).
+- Barcode diubah lewat `POST /produk/:id/barcode` dan `DELETE /produk-barcode/:id` (master data, boleh dihapus), bukan lewat `PUT /produk/:id`.
+
 ### Stok
 - Penjualan **boleh** membuat stok 0 atau minus, karena barang lama belum semua diinput. Tampilkan peringatan di kasir, jangan blokir.
-- Stok awal barang lama dan koreksi stock opname dicatat di `penyesuaian_stok` (jenis `stok_awal`, `opname`, `rusak`).
+- Stok awal barang lama dan koreksi stock opname dicatat di `penyesuaian_stok` (jenis `stok_awal`, `opname`, `rusak`) lewat menu **Produk** (admin dan headadmin).
+  - `stok_awal`: input `qty` + `harga_modal`; HPP ikut rumus moving average.
+  - `opname`: input `stok_fisik`; selisih = fisik − stok sistem (tidak boleh 0), dinilai dengan HPP saat itu, HPP tidak berubah.
+  - `rusak`: input `qty` unit rusak; stok berkurang, dinilai dengan HPP saat itu.
+  - Semua dalam satu transaksi dengan baris produk dikunci `FOR UPDATE`, termasuk jurnalnya (`PenyesuaianStokInService.Create`). Bila nilai jurnal 0 (HPP masih 0), jurnal tidak dibuat.
 - Selama HPP sebuah produk masih 0, penjualannya tercatat dengan HPP 0, sehingga laba terlihat lebih besar dari aslinya dan indikator merah tidak berfungsi. Stok awal sebaiknya diinput sebelum sistem dipakai.
 
 ### Struk
@@ -170,6 +187,8 @@ Cetak per nota: nama barang, qty, harga, subtotal, diskon, total, dibayar, kemba
 ## Jurnal otomatis
 
 Setiap transaksi membuat `jurnal` + `jurnal_detail` di transaksi database yang sama, dengan `sumber_tipe`/`sumber_id`. Total debit harus sama dengan total kredit.
+
+Posting lewat modul `module/jurnal`: `IJurnalInService.Post(ctx, tx, entri)` dipanggil di dalam `database.WithTx` milik InService pemanggil. `Post` membuang baris bernilai 0, menolak jurnal yang tidak seimbang, dan mencari akun lewat konstanta kode di `module/jurnal/tck/domain` (`AkunKas`, `AkunPersediaan`, ...).
 
 | Transaksi | Debit | Kredit |
 |---|---|---|
@@ -217,5 +236,4 @@ Sengaja dibuat minimal. Semua pengeluaran masuk Beban Operasional, jenisnya dibe
 - Apakah ada pembayaran selain tunai (QRIS, transfer)? Jika ada, perlu akun Bank dan kolom metode bayar di penjualan.
 - Server di cloud atau di komputer toko (jaringan lokal)? Menentukan apakah kasir tetap bisa dipakai saat internet mati.
 - Ukuran printer struk (thermal 58 mm atau 80 mm), untuk lebar baris struk.
-- Endpoint dan menu untuk penyesuaian stok (stok awal, opname, rusak): role mana yang boleh, dan masuk menu Produk atau menu sendiri. Tabelnya sudah ada, endpoint belum didaftarkan di seed.
 - Bolehkah harga jadi di atas harga normal? Jika boleh, jurnalnya bagaimana (misalnya kredit Penjualan memakai harga jadi supaya selisih tawar tidak negatif).

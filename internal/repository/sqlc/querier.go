@@ -9,8 +9,27 @@ import (
 )
 
 type Querier interface {
+	CountProduk(ctx context.Context, arg CountProdukParams) (int64, error)
+	CreateBarcode(ctx context.Context, arg CreateBarcodeParams) (int64, error)
+	CreateJurnal(ctx context.Context, arg CreateJurnalParams) (int64, error)
+	CreateJurnalDetail(ctx context.Context, arg CreateJurnalDetailParams) error
+	CreateKategori(ctx context.Context, nama string) (int64, error)
+	CreatePenyesuaianStok(ctx context.Context, arg CreatePenyesuaianStokParams) (int64, error)
+	CreateProduk(ctx context.Context, arg CreateProdukParams) (int64, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (int64, error)
+	DeleteBarcode(ctx context.Context, id uint64) error
+	GetAkunIDByKode(ctx context.Context, kode string) (uint64, error)
+	GetBarcodeByID(ctx context.Context, id uint64) (ProdukBarcode, error)
+	GetBarcodeByKode(ctx context.Context, barcode string) (ProdukBarcode, error)
+	GetBarcodeLookupCache(ctx context.Context, barcode string) (GetBarcodeLookupCacheRow, error)
+	GetKategoriByID(ctx context.Context, id uint64) (Kategori, error)
+	// Perbandingan mengikuti collation tabel (tidak membedakan huruf besar/kecil).
+	GetKategoriByNama(ctx context.Context, nama string) (Kategori, error)
+	GetPenyesuaianStokByID(ctx context.Context, id uint64) (GetPenyesuaianStokByIDRow, error)
+	GetProdukByID(ctx context.Context, id uint64) (GetProdukByIDRow, error)
+	// Wajib di dalam transaksi: mengunci baris produk sebelum stok/HPP diubah.
+	GetProdukStokForUpdate(ctx context.Context, id uint64) (GetProdukStokForUpdateRow, error)
 	// Wajib dipanggil di dalam transaksi. Baris dikunci sampai commit supaya
 	// dua refresh dengan token yang sama tidak bisa lolos bersamaan.
 	GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error)
@@ -20,14 +39,26 @@ type Querier interface {
 	// Dipanggil sekali saat startup (dan saat reload) untuk membangun
 	// map role_kode -> set("METHOD path") di internal/authorize.Store.
 	ListAllPermissions(ctx context.Context) ([]ListAllPermissionsRow, error)
+	// Izin tanpa halaman (menus.tipe = 'aksi', misalnya lihat_hpp) per role.
+	ListAllRoleActions(ctx context.Context) ([]ListAllRoleActionsRow, error)
+	ListBarcodeByProduk(ctx context.Context, produkID uint64) ([]ProdukBarcode, error)
+	ListKategori(ctx context.Context, arg ListKategoriParams) ([]Kategori, error)
 	// Mengembalikan baris tipe='menu' DAN tipe='aksi' milik role tersebut.
 	// Service yang memisahkan: 'menu' dibangun jadi tree, 'aksi' jadi daftar kode.
 	ListMenusByRole(ctx context.Context, kode string) ([]Menu, error)
+	ListPenyesuaianStokByProduk(ctx context.Context, arg ListPenyesuaianStokByProdukParams) ([]ListPenyesuaianStokByProdukRow, error)
+	// q mencocokkan sebagian nama, atau barcode persis.
+	ListProduk(ctx context.Context, arg ListProdukParams) ([]ListProdukRow, error)
 	RevokeAllRefreshTokensByUser(ctx context.Context, userID uint64) error
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
 	// Hanya berhasil (1 baris) bila token lama belum di-revoke.
 	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (int64, error)
+	UpdateKategori(ctx context.Context, arg UpdateKategoriParams) error
 	UpdateLastLogin(ctx context.Context, id uint64) error
+	// Stok dan HPP tidak diubah di sini (hanya lewat pembelian, penjualan, penyesuaian stok).
+	UpdateProduk(ctx context.Context, arg UpdateProdukParams) error
+	UpdateProdukStokHPP(ctx context.Context, arg UpdateProdukStokHPPParams) error
+	UpsertBarcodeLookupCache(ctx context.Context, arg UpsertBarcodeLookupCacheParams) error
 }
 
 var _ Querier = (*Queries)(nil)

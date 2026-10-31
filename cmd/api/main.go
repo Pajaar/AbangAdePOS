@@ -10,6 +10,8 @@ import (
 	"pos-jamu-backend/internal/config"
 	"pos-jamu-backend/internal/database"
 	authconfig "pos-jamu-backend/internal/module/auth/api/config"
+	jurnalinservice "pos-jamu-backend/internal/module/jurnal/service/inservice"
+	produkconfig "pos-jamu-backend/internal/module/produk/api/config"
 	"pos-jamu-backend/internal/router"
 )
 
@@ -38,7 +40,11 @@ func main() {
 		log.Fatalf("auth module: %v", err)
 	}
 
+	// authorizeStore juga dipakai modul lain untuk cek izin aksi (lihat_hpp).
 	authorizeStore := authorize.NewStore()
+	jurnalSvc := jurnalinservice.NewJurnalInService()
+	produkModule := produkconfig.NewModule(db, authorizeStore, jurnalSvc)
+
 	loadCtx, loadCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := authorizeStore.Load(loadCtx, authModule.PermissionInService); err != nil {
 		loadCancel()
@@ -50,7 +56,7 @@ func main() {
 		Cfg:            cfg,
 		DB:             db,
 		AuthorizeStore: authorizeStore,
-		Modules:        []route.Registrar{authModule},
+		Modules:        []route.Registrar{authModule, produkModule},
 	})
 
 	if err := r.Run(":" + cfg.AppPort); err != nil {
