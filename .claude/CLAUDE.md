@@ -33,6 +33,10 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
    - Kolom hasil agregat/window function (`SUM()`, `SUM() OVER`, dll.) dibungkus `CAST(... AS DECIMAL(14,2))` supaya terbaca sebagai `decimal.Decimal`, bukan `interface{}`/string.
    - Pengecualian hanya untuk query yang tidak didukung sqlc (filter dinamis banyak, atau fitur MySQL yang gagal di-generate): tulis manual di file `service/repository` modul terkait, beri komentar alasannya, dan tetap terima `sqlcgen.DBTX` supaya ikut transaksi yang sama.
 
+## Git
+- Commit lewat skill `commit` (`.claude/skills/commit/SKILL.md`): commit hanya atas nama user, **tanpa** baris `Co-Authored-By` atau atribusi Claude.
+- **Jangan push dan jangan buat PR.** User push sendiri lewat terminal; cukup berikan perintah `git push` yang perlu dijalankan.
+
 ## Struktur folder
 
 Arsitektur meniru proyek primecash-x-training (Spring Boot): setiap fitur adalah **modul** dengan tiga lapisan `tck` → `service` → `api`. Modul `auth` adalah contoh acuan; modul baru (produk, jamu, penjualan, piutang, pembelian, laporan, ...) mengikuti bentuk yang sama.
