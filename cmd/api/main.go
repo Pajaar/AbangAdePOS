@@ -10,6 +10,7 @@ import (
 	"pos-jamu-backend/internal/config"
 	"pos-jamu-backend/internal/database"
 	authconfig "pos-jamu-backend/internal/module/auth/api/config"
+	jamuconfig "pos-jamu-backend/internal/module/jamu/api/config"
 	jurnalinservice "pos-jamu-backend/internal/module/jurnal/service/inservice"
 	produkconfig "pos-jamu-backend/internal/module/produk/api/config"
 	"pos-jamu-backend/internal/router"
@@ -44,6 +45,7 @@ func main() {
 	authorizeStore := authorize.NewStore()
 	jurnalSvc := jurnalinservice.NewJurnalInService()
 	produkModule := produkconfig.NewModule(db, authorizeStore, jurnalSvc)
+	jamuModule := jamuconfig.NewModule(db, authorizeStore, produkModule.ProdukInService)
 
 	loadCtx, loadCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := authorizeStore.Load(loadCtx, authModule.PermissionInService); err != nil {
@@ -56,7 +58,7 @@ func main() {
 		Cfg:            cfg,
 		DB:             db,
 		AuthorizeStore: authorizeStore,
-		Modules:        []route.Registrar{authModule, produkModule},
+		Modules:        []route.Registrar{authModule, produkModule, jamuModule},
 	})
 
 	if err := r.Run(":" + cfg.AppPort); err != nil {

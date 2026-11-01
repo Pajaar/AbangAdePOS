@@ -17,6 +17,7 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
   - `000003_jamu_sachet_penyesuaian_stok`: tabel `jamu_sachet` (menggantikan `jamu.sachet_id`/`sachet_per_gelas`) dan `penyesuaian_stok`
   - `000004_seed_akun_cek_harga`: seed `akun` dan endpoint `POST /api/v1/kasir/cek-harga` (menu Kasir)
   - `000005_endpoint_penyesuaian_stok`: endpoint `POST/GET /api/v1/produk/:id/penyesuaian-stok` di menu Produk (admin + headadmin)
+  - `000006_jamu_satu_sachet`: `jamu.produk_id` (satu sachet per jamu) menggantikan `jamu_sachet` (tabel dihapus); `penjualan_detail_additional` berisi `additional_item_id` ATAU `produk_id` (sachet tambahan)
   - Perubahan skema berikutnya selalu lewat file migrasi **baru**; jangan ubah migrasi yang sudah ada karena mungkin sudah dijalankan di database. Setelah menambah migrasi, jalankan `sqlc generate`.
   - Menjalankan migrasi ke database di `.env` (Railway): `.\scripts\migrate.ps1 up` (juga `version`, `down 1`, dst.). Skrip membaca `.env` sendiri, menyamarkan password di output, dan minta konfirmasi nama database untuk `drop`/`down`/`force`/`goto`. Database Railway berisi data asli: jangan jalankan `drop` atau `down` tanpa izin eksplisit user.
 
@@ -41,7 +42,7 @@ Dokumen ini merangkum semua keputusan desain yang sudah disepakati. Ikuti keputu
 
 ## Struktur folder
 
-Arsitektur meniru proyek primecash-x-training (Spring Boot): setiap fitur adalah **modul** dengan tiga lapisan `tck` → `service` → `api`. Modul yang sudah ada: `auth`, `produk` (contoh paling lengkap: validator, paging, filter HPP, transaksi dengan row lock + jurnal), dan `jurnal` (hanya tck + service, dipakai modul lain). Modul baru (jamu, pembelian, penjualan, piutang, laporan, ...) mengikuti bentuk yang sama.
+Arsitektur meniru proyek primecash-x-training (Spring Boot): setiap fitur adalah **modul** dengan tiga lapisan `tck` → `service` → `api`. Modul yang sudah ada: `auth`, `produk` (contoh paling lengkap: validator, paging, filter HPP, transaksi dengan row lock + jurnal), `jamu` (menu jamu + item tambahan; contoh modul yang memakai kontrak modul lain, `produk/tck/inservice`), dan `jurnal` (hanya tck + service, dipakai modul lain). Modul baru (pembelian, penjualan, piutang, laporan, ...) mengikuti bentuk yang sama. Antar-modul hanya boleh saling memakai lewat kontrak `tck`, dirakit di `cmd/api/main.go`.
 
 ```
 cmd/api/main.go                 # rakit modul, muat izin, jalankan router
@@ -128,8 +129,10 @@ CORS hanya dipasang bila `CORS_ALLOWED_ORIGINS` di `.env` terisi (lihat Deployme
 
 ### Jenis barang
 - **`produk`**: semua barang yang distok (obat, sachet jamu, minyak urut, dll). Dikelompokkan lewat `kategori` (murni pengelompokan, tidak memengaruhi logika). Stok **selalu** dipotong saat terjual.
-- **`jamu`**: menu jamu **seduh per gelas** (diseduh langsung saat dipesan, tidak pakai termos). Tidak punya stok sendiri. Sachet yang dipakai ada di `jamu_sachet` (boleh lebih dari satu jenis per jamu). Saat terjual, stok setiap sachet dipotong sebanyak `jumlah × qty gelas`. Harga seduh (`jamu.harga_jual`) berbeda dari harga sachet utuh (`produk.harga_normal`).
-- **`additional_items`**: tambahan untuk jamu seduh, harga fix. Kalau `produk_id` terisi, stok produk itu dipotong; kalau kosong (madu, telur), tidak dilacak dan HPP-nya 0.
+- **`jamu`**: menu jamu **seduh per gelas** (satu sachet diseduh langsung saat dipesan, bukan dibuat banyak sekaligus). Satu jamu = **tepat satu sachet dari satu produk** (`jamu.produk_id`). Tidak punya stok sendiri: saat terjual, stok produk sachet itu dipotong 1 per gelas. Harga seduh (`jamu.harga_jual`) berbeda dari harga sachet utuh (`produk.harga_normal`). Modul `module/jamu`.
+- **Tambahan untuk jamu seduh** (dicatat di `penjualan_detail_additional`, salah satu dari dua jenis):
+  - **Item tambahan tetap** (`additional_items`: telur, madu): harga fix. Kalau `produk_id` terisi, stok produk itu dipotong; kalau kosong, tidak dilacak dan HPP-nya 0 (biaya bahan lewat pengeluaran).
+  - **Sachet tambahan**: pembeli minta sachet kedua di gelas yang sama, boleh produk apa saja (Buyung Upik + 1 sachet Kunyit Asam). Bukan menu jamu baru dan tidak didaftarkan di `additional_items`; baris tambahan langsung menunjuk `produk_id`, harga = snapshot `produk.harga_normal`, stok produk dipotong, HPP = snapshot `hpp_rata_rata`.
 - `penjualan_detail` berisi **produk ATAU jamu** (CHECK constraint), tidak keduanya.
 
 ### HPP: rata-rata bergerak (moving average)
@@ -140,7 +143,7 @@ jika stok_lama <= 0: hpp_baru = harga_beli
 ```
 Stok awal (`penyesuaian_stok` jenis `stok_awal`) dihitung dengan rumus yang sama.
 
-HPP jamu seduh per gelas = jumlah dari `jamu_sachet.jumlah * hpp_rata_rata` setiap sachet.
+HPP jamu seduh per gelas = `hpp_rata_rata` produk sachetnya (satu gelas = satu sachet), ditambah HPP tambahan yang dipilih (sachet tambahan atau item tambahan yang terhubung produk).
 
 ### Harga di kasir dan peringatan di bawah modal
 - **Role cashier tidak boleh menerima angka HPP, modal, nett, tengah, atau margin dari API dalam bentuk apa pun.** Termasuk tidak dikirim tersembunyi di respons lalu disembunyikan di frontend.

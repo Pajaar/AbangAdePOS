@@ -356,13 +356,7 @@ type Jamu struct {
 	HargaJual decimal.Decimal `json:"harga_jual"`
 	Aktif     bool            `json:"aktif"`
 	CreatedAt time.Time       `json:"created_at"`
-}
-
-type JamuSachet struct {
-	ID       uint64 `json:"id"`
-	JamuID   uint64 `json:"jamu_id"`
-	ProdukID uint64 `json:"produk_id"`
-	Jumlah   int32  `json:"jumlah"`
+	ProdukID  uint64          `json:"produk_id"`
 }
 
 type Jurnal struct {
@@ -481,10 +475,11 @@ type PenjualanDetail struct {
 type PenjualanDetailAdditional struct {
 	ID                uint64          `json:"id"`
 	PenjualanDetailID uint64          `json:"penjualan_detail_id"`
-	AdditionalItemID  uint64          `json:"additional_item_id"`
 	Qty               int32           `json:"qty"`
 	Harga             decimal.Decimal `json:"harga"`
 	Hpp               decimal.Decimal `json:"hpp"`
+	AdditionalItemID  sql.NullInt64   `json:"additional_item_id"`
+	ProdukID          sql.NullInt64   `json:"produk_id"`
 }
 
 type PenyesuaianStok struct {

@@ -13,9 +13,13 @@ import (
 	"pos-jamu-backend/internal/module/produk/api/executor"
 	"pos-jamu-backend/internal/module/produk/api/validator"
 	"pos-jamu-backend/internal/module/produk/service/inservice"
+	produktck "pos-jamu-backend/internal/module/produk/tck/inservice"
 )
 
 type Module struct {
+	// ProdukInService dipakai modul lain (menu jamu) lewat kontraknya.
+	ProdukInService produktck.IProdukInService
+
 	kategori *controller.KategoriController
 	produk   *controller.ProdukController
 	barcode  *controller.BarcodeController
@@ -39,6 +43,7 @@ func NewModule(db *sql.DB, actions access.IActionChecker, jurnal jurnaltck.IJurn
 	produkHarga := validator.ProdukHargaValidator{}
 
 	return &Module{
+		ProdukInService: produkSvc,
 		kategori: controller.NewKategoriController(controller.KategoriExecutors{
 			List:   executor.NewKategoriListExecutor(kategoriSvc),
 			Create: executor.NewKategoriCreateExecutor(kategoriSvc, kategoriNamaUnik),

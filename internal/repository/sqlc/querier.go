@@ -10,7 +10,9 @@ import (
 
 type Querier interface {
 	CountProduk(ctx context.Context, arg CountProdukParams) (int64, error)
+	CreateAdditionalItem(ctx context.Context, arg CreateAdditionalItemParams) (int64, error)
 	CreateBarcode(ctx context.Context, arg CreateBarcodeParams) (int64, error)
+	CreateJamu(ctx context.Context, arg CreateJamuParams) (int64, error)
 	CreateJurnal(ctx context.Context, arg CreateJurnalParams) (int64, error)
 	CreateJurnalDetail(ctx context.Context, arg CreateJurnalDetailParams) error
 	CreateKategori(ctx context.Context, nama string) (int64, error)
@@ -19,10 +21,12 @@ type Querier interface {
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (int64, error)
 	DeleteBarcode(ctx context.Context, id uint64) error
+	GetAdditionalItemByID(ctx context.Context, id uint64) (GetAdditionalItemByIDRow, error)
 	GetAkunIDByKode(ctx context.Context, kode string) (uint64, error)
 	GetBarcodeByID(ctx context.Context, id uint64) (ProdukBarcode, error)
 	GetBarcodeByKode(ctx context.Context, barcode string) (ProdukBarcode, error)
 	GetBarcodeLookupCache(ctx context.Context, barcode string) (GetBarcodeLookupCacheRow, error)
+	GetJamuByID(ctx context.Context, id uint64) (GetJamuByIDRow, error)
 	GetKategoriByID(ctx context.Context, id uint64) (Kategori, error)
 	// Perbandingan mengikuti collation tabel (tidak membedakan huruf besar/kecil).
 	GetKategoriByNama(ctx context.Context, nama string) (Kategori, error)
@@ -36,12 +40,17 @@ type Querier interface {
 	GetRoleByKode(ctx context.Context, kode string) (Role, error)
 	GetUserByID(ctx context.Context, id uint64) (GetUserByIDRow, error)
 	GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error)
+	// produk_id kosong = tambahan yang tidak dilacak stoknya (telur, madu), HPP 0.
+	ListAdditionalItems(ctx context.Context, arg ListAdditionalItemsParams) ([]ListAdditionalItemsRow, error)
 	// Dipanggil sekali saat startup (dan saat reload) untuk membangun
 	// map role_kode -> set("METHOD path") di internal/authorize.Store.
 	ListAllPermissions(ctx context.Context) ([]ListAllPermissionsRow, error)
 	// Izin tanpa halaman (menus.tipe = 'aksi', misalnya lihat_hpp) per role.
 	ListAllRoleActions(ctx context.Context) ([]ListAllRoleActionsRow, error)
 	ListBarcodeByProduk(ctx context.Context, produkID uint64) ([]ProdukBarcode, error)
+	// Termasuk data produk sachet: nama, stok (peringatan stok), dan HPP
+	// (HPP per gelas = HPP sachet karena satu gelas = satu sachet).
+	ListJamu(ctx context.Context, arg ListJamuParams) ([]ListJamuRow, error)
 	ListKategori(ctx context.Context, arg ListKategoriParams) ([]Kategori, error)
 	// Mengembalikan baris tipe='menu' DAN tipe='aksi' milik role tersebut.
 	// Service yang memisahkan: 'menu' dibangun jadi tree, 'aksi' jadi daftar kode.
@@ -53,6 +62,8 @@ type Querier interface {
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
 	// Hanya berhasil (1 baris) bila token lama belum di-revoke.
 	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (int64, error)
+	UpdateAdditionalItem(ctx context.Context, arg UpdateAdditionalItemParams) error
+	UpdateJamu(ctx context.Context, arg UpdateJamuParams) error
 	UpdateKategori(ctx context.Context, arg UpdateKategoriParams) error
 	UpdateLastLogin(ctx context.Context, id uint64) error
 	// Stok dan HPP tidak diubah di sini (hanya lewat pembelian, penjualan, penyesuaian stok).
